@@ -14,35 +14,31 @@ namespace SlackFunctions
 {
     public class SlackTimerTrigger
     {
-        private const string SlackUrl = "https://hooks.slack.com/services/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";
-        private const string StackOverviewUrl = "https://api.stackexchange.com/2.3/search?fromdate={0}&order=desc&sort=activity&intitle=rcs&site=stackoverflow";
-
-        private readonly ILogger<SlackTimerTrigger> _log;
-
-        public SlackTimerTrigger(ILogger<SlackTimerTrigger> log)
-        {
-            _log = log;
-        }
+        private const string SlackUrl = "https://hooks.slack.com/services/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";
+        // private const string StackOverviewUrl = "https://api.stackexchange.com/2.3/search?fromdate={0}&order=desc&sort=activity&intitle=rcs&site=stackoverflow";
+        private const string StackOverviewUrl = "https://api.stackexchange.com/2.3/search?order=desc&sort=activity&intitle=rcs&site=stackoverflow";
 
         [FunctionName("SlackTimerTrigger")]
-        public async Task Run([TimerTrigger("0 * * * * *")]TimerInfo myTimer)
+        public async Task Run([TimerTrigger("0 * * * * *")]TimerInfo myTimer, ILogger logger)
         {
             var json = await MakeStackOverflowRequest();
             var jsonObj = JsonSerializer.Deserialize<Root>(json);
 
-            await MakeSlackRequest($"Hello with stack-overflow call. Number of questions: {jsonObj.Items.Count}");
-            _log.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
+            logger.LogInformation($"Hello with stack-overflow call. Number of questions: {jsonObj.Items.Count}");
+            await MakeSlackRequest($"Hello with stack-overflow call. Number of questions: {jsonObj.Items.Count}", logger);
+            logger.LogInformation($"C# Timer trigger function executed at: {DateTime.Now}");
         }
 
-        public async Task<string> MakeSlackRequest(string message)
+        public async Task<string> MakeSlackRequest(string message, ILogger logger)
         {
             using(var client = new HttpClient())
             {
                 var request = new StringContent("{'text':'" + message + "'}", Encoding.UTF8, "application/json");
+                logger.LogInformation("Hello with stack-overflow call. Sending: {'text':'" + message + "'}");
                 var response = await client.PostAsync(SlackUrl, request);
 
                 var result = await response.Content.ReadAsStringAsync();
-                _log.LogInformation(result);
+                logger.LogInformation(result);
 
                 return result;
             }
@@ -50,9 +46,6 @@ namespace SlackFunctions
 
         public async Task<string> MakeStackOverflowRequest()
         {
-            // Last 24 hours
-            var epochTime = (int)DateTime.UtcNow.AddDays(-1).Subtract(new DateTime(1970,1,1)).TotalSeconds;
-
             var clientHandler = new HttpClientHandler
             {
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
@@ -60,16 +53,14 @@ namespace SlackFunctions
 
             using (var client = new HttpClient(clientHandler))
             {
-                var response = await client.GetAsync(string.Format(StackOverviewUrl, epochTime));
-
+                var response = await client.GetAsync(StackOverviewUrl);
                 var result = await response.Content.ReadAsStringAsync();
-                _log.LogInformation(result);
 
                 return result;
             }
         }
-    }
-    public class Item
+
+public class Item
     {
         [JsonPropertyName("tags")]
         public List<string> Tags { get; set; }
@@ -136,5 +127,6 @@ namespace SlackFunctions
     {
         [JsonPropertyName("items")]
         public List<Item> Items { get; set; }
+    }
     }
 }
